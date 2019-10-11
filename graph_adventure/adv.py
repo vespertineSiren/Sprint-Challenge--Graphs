@@ -1,6 +1,7 @@
 from room import Room
 from player import Player
 from world import World
+from itertools import permutations
 
 import random
 
@@ -21,8 +22,146 @@ player = Player("Name", world.startingRoom)
 
 
 # FILL THIS IN
-traversalPath = ['n', 's']
+traversalPath = []
 
+
+def build_traversal_graph(player):
+    # Build out empty traversal Graph
+
+    stack = [player.currentRoom.id]
+    traversal_graph = dict()
+
+    while len(stack) > 0:
+        room = stack.pop()
+
+        if room not in traversal_graph.keys():
+            traversal_graph[room] = {}
+
+            for d in roomGraph[room][1].keys():
+                stack.append(roomGraph[room][1][d])
+                traversal_graph[room][d] = '?'
+
+    return traversal_graph
+
+
+def mystery_door_search(traversal_graph, start):
+    visited = set()
+
+    queue = [[start]]
+
+    while len(queue) > 0:
+        path_inner = queue.pop(0)
+        room = path_inner[-1]
+
+        if room not in visited:
+            visited.add(room)
+
+            # Check the doors in the room and notes that information
+            doors = [k for k, v in traversal_graph[room].items() if v == '?']
+            # Check for unopened doors
+            if len(doors) > 0:
+                # Goes back to room with unopened doors.
+                return path_inner[1:]
+
+            # Adds to the rooms weve seen before
+            for d in traversal_graph[room]:
+                queue.append(path_inner + [traversal_graph[room][d]])
+
+    return None
+
+
+
+def find_route(priority=None):
+    # To be used in finding all permutations of directions.
+    # Not super effective but watever
+    if priority is None:
+        priority = list('nwes')
+
+    opposite = {
+        'n': 's',
+        's': 'n',
+        'e': 'w',
+        'w': 'e'
+    }
+
+    traversal_graph = build_traversal_graph(player)
+    next_move = [None]
+    moves = []
+    path = [player.currentRoom.id]
+    visited = set()
+
+
+    #Loop until we've visited all the rooms.
+    while len(visited) < len(traversal_graph):
+        # Gets path and last move from moves stack
+        move = next_move.pop()
+
+        #Recent room from path.
+        room = path[-1]
+        visited.add(room)
+
+        # If we were able to move.
+        if move is not None:
+            # Adds previous rooms to rooms visited.
+            traversal_graph[room][opposite[move]] = path[-2]
+            # Adds this room to to previous rooms visted rooms.
+            # Essentially a backtracking system.
+            traversal_graph[path[-2]][move] = room
+            moves.append(move)
+
+        # Checks for unvisited directions.
+        if '?' in traversal_graph[room].values():
+            # Get unexplored directions
+            unexplored = [d for d, v in traversal_graph[room].items() if v == '?']
+            # Decides next move. Could be made more dynamic.
+            for d in priority:
+                if d in unexplored:
+                    next_move.append(d)
+                    path.append(roomGraph[room][1][d])
+                    # break out of loop when we find a move
+                    break
+
+        # Handles dead ends.
+        else:
+            # find path to room with unopened door
+            path_back = mystery_door_search(traversal_graph, room)
+
+            #Edge case
+            if path_back is None:
+                break
+
+            moves_back = []
+            for room_id in path_back:
+                # find direction of this room relative to current location
+                for d in traversal_graph[room].keys():
+                    if traversal_graph[room][d] == room_id:
+                        direction = d
+                        moves_back.append(direction)
+                        break
+                room = room_id
+            moves += moves_back
+            path += path_back
+            next_move.append(None)
+
+    return moves
+
+# Finds all potential directional combinations.
+# Not the most effective
+perm = permutations(['n', 's', 'w', 'e'])
+shortest = None
+sp = None
+for p in perm:
+    if shortest is None:
+        shortest = find_route(list(p))
+        sp = p
+    else:
+        path = find_route(list(p))
+        if len(path) < len(shortest):
+            shortest = path
+            sp = p
+
+print(sp)
+traversalPath = shortest
 
 # TRAVERSAL TEST
 visited_rooms = set()
